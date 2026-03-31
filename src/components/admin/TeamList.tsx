@@ -39,7 +39,7 @@ export default function TeamList({ team, searchQuery }: { team: TeamMember[], se
         filteredTeam.map((member) => (
           <div key={member.id} className="bg-brand-surface border border-white/5 rounded-3xl p-4 flex gap-4 items-center group">
             <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-brand-bg border border-white/10">
-              <img src={member.image} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src={member.image || undefined} alt={member.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-bold text-white truncate group-hover:text-brand-primary transition-colors">{member.name}</h3>

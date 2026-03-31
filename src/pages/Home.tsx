@@ -339,9 +339,9 @@ export default function Home() {
                   {(item.imageUrl || item.videoUrl) && (
                     <div className="relative aspect-video overflow-hidden">
                       {item.videoUrl ? (
-                        <video src={item.videoUrl} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
+                        <video src={item.videoUrl || undefined} className="w-full h-full object-cover" muted loop onMouseOver={e => e.currentTarget.play()} onMouseOut={e => e.currentTarget.pause()} />
                       ) : (
-                        <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
+                        <img src={item.imageUrl || undefined} alt={item.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-brand-surface via-transparent to-transparent opacity-60"></div>
                     </div>
@@ -403,7 +403,7 @@ export default function Home() {
                   className="group bg-brand-surface border border-white/5 rounded-3xl overflow-hidden hover:border-brand-secondary/30 transition-all"
                 >
                   <div className="relative aspect-video overflow-hidden">
-                    <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
+                    <img src={video.thumbnail || undefined} alt={video.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" referrerPolicy="no-referrer" />
                     <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors"></div>
                     <div className="absolute top-4 right-4 px-3 py-1 bg-brand-secondary text-white text-[10px] font-black rounded-full shadow-lg">
                       {video.price}

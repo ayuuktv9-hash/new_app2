@@ -46,7 +46,7 @@ export default function VideoList({ videos, searchQuery }: { videos: CommunityVi
         filteredVideos.map((video) => (
           <div key={video.id} className="bg-brand-surface border border-white/5 rounded-3xl p-4 flex gap-6 items-center group">
             <div className="w-32 aspect-video rounded-xl overflow-hidden flex-shrink-0">
-              <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src={video.thumbnail || undefined} alt={video.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-bold text-white truncate group-hover:text-brand-secondary transition-colors">{video.title}</h3>
