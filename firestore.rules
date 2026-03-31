@@ -1,37 +1,161 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: userId
+// Fields:
+//   - role: string (required, enum: ['admin', 'user'])
+//   - email: string (required, email format)
+//
+// Collection: news
+// Document ID: auto-generated
+// Fields:
+//   - title: string (required, size < 200)
+//   - content: string (required, size < 5000)
+//   - author: string (required, size < 100)
+//   - date: string (required, date format)
+//   - imageUrl: string (optional, url format)
+//   - videoUrl: string (optional, url format)
+//
+// Collection: community_videos
+// Document ID: auto-generated
+// Fields:
+//   - title: string (required, size < 200)
+//   - author: string (required, size < 100)
+//   - authorUid: string (required, uid format)
+//   - thumbnail: string (required, url format)
+//   - price: string (required, size < 50)
+//   - video_url: string (required, url format)
+//   - published: bool (required)
+//
+// Collection: team
+// Document ID: auto-generated
+// Fields:
+//   - name: string (required, size < 100)
+//   - role: string (required, size < 100)
+//   - bio: string (required, size < 1000)
+//   - image: string (required, url format)
+//   - icon: string (required, size < 50)
+//   - linkedin: string (optional, url format)
+//   - twitter: string (optional, url format)
+//   - github: string (optional, url format)
+//   - email: string (optional, email format)
+//
+// ===============================================================
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isAuthenticated() && request.auth.token.email == "mixecultura25@gmail.com";
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "garciaperezjoni80@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['role', 'email']) &&
+             hasOnlyAllowedFields(['role', 'email']) &&
+             data.role in ['admin', 'user'] &&
+             isValidEmail(data.email);
+    }
+
+    function isValidNews(data) {
+      return hasRequiredFields(['title', 'content', 'author', 'date']) &&
+             data.title is string && data.title.size() < 200 &&
+             data.content is string && data.content.size() < 5000 &&
+             data.author is string && data.author.size() < 100 &&
+             (!('imageUrl' in data) || isValidUrl(data.imageUrl)) &&
+             (!('videoUrl' in data) || isValidUrl(data.videoUrl));
+    }
+
+    function isValidCommunityVideo(data) {
+      return hasRequiredFields(['title', 'author', 'authorUid', 'thumbnail', 'price', 'video_url', 'published']) &&
+             data.title is string && data.title.size() < 200 &&
+             data.author is string && data.author.size() < 100 &&
+             data.authorUid is string &&
+             isValidUrl(data.thumbnail) &&
+             data.price is string && data.price.size() < 50 &&
+             isValidUrl(data.video_url) &&
+             data.published is bool;
+    }
+
+    function isValidTeamMember(data) {
+      return hasRequiredFields(['name', 'role', 'bio', 'image', 'icon']) &&
+             data.name is string && data.name.size() < 100 &&
+             data.role is string && data.role.size() < 100 &&
+             data.bio is string && data.bio.size() < 1000 &&
+             isValidUrl(data.image) &&
+             data.icon is string &&
+             (!('linkedin' in data) || isValidUrl(data.linkedin)) &&
+             (!('twitter' in data) || isValidUrl(data.twitter)) &&
+             (!('github' in data) || isValidUrl(data.github)) &&
+             (!('email' in data) || isValidEmail(data.email));
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) && request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) && request.resource.data.role == resource.data.role || isAdmin());
     }
 
     match /news/{newsId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && isValidNews(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /community_videos/{videoId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if (isAuthenticated() && isValidCommunityVideo(request.resource.data) && (request.resource.data.authorUid == request.auth.uid || isAdmin()));
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.authorUid == request.auth.uid);
     }
 
     match /team/{memberId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && isValidTeamMember(request.resource.data);
+      allow delete: if isAdmin();
     }
     
-    // Fallback for any other collection
     match /{path=**} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
   }
 }

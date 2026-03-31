@@ -37,20 +37,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         return userDoc.data().role as "admin" | "user";
       } else {
         // Default admin for the super user
-        const role = email === "mixecultura25@gmail.com" ? "admin" : "user";
+        const role = email === "garciaperezjoni80@gmail.com" ? "admin" : "user";
         // Create user doc if it doesn't exist
         await setDoc(doc(db, "users", uid), {
-          uid,
-          email,
           role,
-          displayName: auth.currentUser?.displayName || email.split('@')[0],
-          photoURL: auth.currentUser?.photoURL || ""
+          email
         });
         return role;
       }
     } catch (err) {
       console.error("Error fetching user role:", err);
-      return email === "mixecultura25@gmail.com" ? "admin" : "user";
+      return email === "garciaperezjoni80@gmail.com" ? "admin" : "user";
     }
   };
 

@@ -144,12 +144,17 @@ async function startServer() {
   app.post("/api/livekit/token", async (req, res) => {
     try {
       const { roomName, participantName, isBroadcaster } = req.body;
-      const apiKey = process.env.LIVEKIT_API_KEY || 'APISBhav5rpQHrE';
-      const apiSecret = process.env.LIVEKIT_API_SECRET || 'eJnJBce2ysaavhaIJALPN10WfFFA6UqCfY9OJiOVvd4B';
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-      const at = new AccessToken(apiKey, apiSecret, {
-        identity: participantName || `user-${Math.floor(Math.random() * 10000)}`,
-      });
+    if (!apiKey || !apiSecret) {
+      console.error("LIVEKIT_API_KEY or LIVEKIT_API_SECRET not set in environment");
+      return res.status(500).json({ error: "LiveKit configuration missing" });
+    }
+
+    const at = new AccessToken(apiKey, apiSecret, {
+      identity: participantName || `user-${Math.floor(Math.random() * 10000)}`,
+    });
 
       at.addGrant({
         roomJoin: true,
