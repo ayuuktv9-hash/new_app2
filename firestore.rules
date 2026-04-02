@@ -126,6 +126,19 @@ service cloud.firestore {
              (!('email' in data) || isValidEmail(data.email));
     }
 
+    function isValidStreamStats(data) {
+      return hasRequiredFields(['gives', 'broadcasterName']) &&
+             data.gives is int && data.gives >= 0 &&
+             data.broadcasterName is string && data.broadcasterName.size() < 100;
+    }
+
+    function isValidStreamGive(data) {
+      return hasRequiredFields(['userId', 'broadcasterId', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.broadcasterId is string &&
+             data.timestamp is timestamp;
+    }
+
     // ===============================================================
     // Match Rules
     // ===============================================================
@@ -152,6 +165,21 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if isAdmin() && isValidTeamMember(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    match /stream_stats/{broadcasterId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidStreamStats(request.resource.data) && request.resource.data.gives == 0;
+      allow update: if isAuthenticated() && isValidStreamStats(request.resource.data) &&
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['gives']) &&
+                     request.resource.data.gives == resource.data.gives + 1 &&
+                     !exists(/databases/$(database)/documents/stream_gives/$(request.auth.uid + '_' + broadcasterId)) &&
+                     getAfter(/databases/$(database)/documents/stream_gives/$(request.auth.uid + '_' + broadcasterId)) != null;
+    }
+
+    match /stream_gives/{giveId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidStreamGive(request.resource.data) && giveId == request.auth.uid + '_' + request.resource.data.broadcasterId;
     }
     
     match /{path=**} {

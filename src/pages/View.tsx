@@ -1,10 +1,33 @@
 import React, { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { Room, RoomEvent, Track } from "livekit-client";
-import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw, Play, Pause, Minimize2, X, HelpCircle } from "lucide-react";
+import { MonitorPlay, Users, MessageSquare, Send, Heart, Share2, Volume2, VolumeX, Maximize2, RefreshCw, Play, Pause, Minimize2, X, HelpCircle, Gift } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "motion/react";
 import Chat from "../components/Chat";
+import { db, auth, handleFirestoreError, OperationType } from "../firebase";
+import { doc, onSnapshot, setDoc, writeBatch, increment, serverTimestamp, getDoc } from "firebase/firestore";
+
+// Floating Heart Component for visual feedback
+const FloatingHeart = ({ id, onComplete }: { id: number; onComplete: (id: number) => void }) => {
+  return (
+    <motion.div
+      initial={{ y: 0, x: 0, opacity: 1, scale: 0.5 }}
+      animate={{ 
+        y: -200, 
+        x: Math.random() * 100 - 50, 
+        opacity: 0,
+        scale: 1.5,
+        rotate: Math.random() * 40 - 20
+      }}
+      transition={{ duration: 1.5, ease: "easeOut" }}
+      onAnimationComplete={() => onComplete(id)}
+      className="absolute bottom-10 right-10 text-red-500 pointer-events-none z-50"
+    >
+      <Heart className="w-8 h-8 fill-current" />
+    </motion.div>
+  );
+};
 
 export default function View() {
   const [broadcasters, setBroadcasters] = useState<any[]>([]);
@@ -12,6 +35,8 @@ export default function View() {
   const [viewers, setViewers] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [givesCount, setGivesCount] = useState(0);
+  const [hearts, setHearts] = useState<{ id: number }[]>([]);
   const [username, setUsername] = useState("");
   const [isRegistered, setIsRegistered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -93,6 +118,8 @@ export default function View() {
 
   const joinStream = async (broadcaster: any) => {
     setSelectedBroadcaster(broadcaster);
+    setIsLiked(false);
+    setGivesCount(0);
     socketRef.current?.emit("watcher", broadcaster.id);
 
     if (roomRef.current) {
@@ -236,6 +263,83 @@ export default function View() {
       video.removeEventListener("pause", handlePause);
     };
   }, [selectedBroadcaster]);
+
+  useEffect(() => {
+    if (!selectedBroadcaster) return;
+
+    const statsRef = doc(db, "stream_stats", selectedBroadcaster.id);
+    const unsubscribe = onSnapshot(statsRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setGivesCount(docSnap.data().gives || 0);
+      } else {
+        setGivesCount(0);
+      }
+    }, (error) => {
+      console.error("Error fetching stream stats:", error);
+    });
+
+    // Check if user already liked this stream
+    const checkLike = async () => {
+      if (auth.currentUser) {
+        const giveRef = doc(db, "stream_gives", `${auth.currentUser.uid}_${selectedBroadcaster.id}`);
+        const giveSnap = await getDoc(giveRef);
+        setIsLiked(giveSnap.exists());
+      }
+    };
+    checkLike();
+
+    return () => unsubscribe();
+  }, [selectedBroadcaster]);
+
+  const handleGive = async () => {
+    if (!selectedBroadcaster || !auth.currentUser || isLiked) return;
+
+    const broadcasterId = selectedBroadcaster.id;
+    const userId = auth.currentUser.uid;
+    const giveId = `${userId}_${broadcasterId}`;
+
+    try {
+      const batch = writeBatch(db);
+      
+      // 1. Create the give document
+      const giveRef = doc(db, "stream_gives", giveId);
+      batch.set(giveRef, {
+        userId,
+        broadcasterId,
+        timestamp: serverTimestamp()
+      });
+
+      // 2. Increment the gives counter
+      const statsRef = doc(db, "stream_stats", broadcasterId);
+      const statsSnap = await getDoc(statsRef);
+      
+      if (!statsSnap.exists()) {
+        batch.set(statsRef, {
+          gives: 1,
+          broadcasterName: selectedBroadcaster.name
+        });
+      } else {
+        batch.update(statsRef, {
+          gives: increment(1)
+        });
+      }
+
+      await batch.commit();
+      
+      setIsLiked(true);
+      
+      // Add heart animation
+      const newHeartId = Date.now();
+      setHearts(prev => [...prev, { id: newHeartId }]);
+      
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `stream_stats/${broadcasterId}`);
+    }
+  };
+
+  const removeHeart = (id: number) => {
+    setHearts(prev => prev.filter(h => h.id !== id));
+  };
 
   const formatTime = (time: number) => {
     if (isNaN(time)) return "00:00";
@@ -455,13 +559,19 @@ export default function View() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => setIsLiked(!isLiked)}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all ${isLiked ? 'bg-red-500 text-white' : 'bg-white/5 text-neutral-400 hover:bg-white/10'}`}
-                  >
-                    <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
-                    {isLiked ? 'Me gusta' : 'Apoyar'}
-                  </button>
+                  <div className="flex flex-col items-center">
+                    <button 
+                      onClick={handleGive}
+                      disabled={isLiked}
+                      className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all ${isLiked ? 'bg-red-500/20 text-red-500 cursor-default' : 'bg-brand-primary text-white hover:bg-brand-primary/80 shadow-lg shadow-brand-primary/20'}`}
+                    >
+                      <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+                      {isLiked ? '¡Gracias!' : 'Dar Apoyo'}
+                    </button>
+                    <span className="text-[10px] font-bold text-neutral-500 mt-1 uppercase tracking-widest">
+                      {givesCount} apoyos
+                    </span>
+                  </div>
                   <div className="relative">
                     <button 
                       onClick={() => setShowShareMenu(!showShareMenu)}
@@ -549,6 +659,13 @@ export default function View() {
             <div className="flex-1 flex flex-col overflow-hidden">
               <Chat socket={socketRef.current} isHost={false} />
             </div>
+          </div>
+
+          {/* Floating Hearts Container */}
+          <div className="fixed inset-0 pointer-events-none z-[60]">
+            {hearts.map(heart => (
+              <FloatingHeart key={heart.id} id={heart.id} onComplete={removeHeart} />
+            ))}
           </div>
         </div>
       )}

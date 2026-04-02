@@ -55,6 +55,27 @@
         "email": { "type": "string" }
       },
       "required": ["role", "email"]
+    },
+    "StreamStats": {
+      "title": "StreamStats",
+      "description": "Statistics for a live stream",
+      "type": "object",
+      "properties": {
+        "gives": { "type": "integer" },
+        "broadcasterName": { "type": "string" }
+      },
+      "required": ["gives", "broadcasterName"]
+    },
+    "StreamGive": {
+      "title": "StreamGive",
+      "description": "A 'give' or 'like' from a user to a stream",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "broadcasterId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "broadcasterId", "timestamp"]
     }
   },
   "firestore": {
@@ -73,6 +94,14 @@
     "users": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles and roles"
+    },
+    "stream_stats": {
+      "schema": { "$ref": "#/entities/StreamStats" },
+      "description": "Stream statistics"
+    },
+    "stream_gives": {
+      "schema": { "$ref": "#/entities/StreamGive" },
+      "description": "Individual stream gives"
     }
   }
 }
